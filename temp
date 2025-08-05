@@ -1,0 +1,170 @@
+import 'package:flutter/material.dart';
+import 'package:hive/hive.dart';
+import 'package:test_app/app/controllers/assets_controller.dart';
+import 'package:test_app/app/models/settings.dart';
+import 'package:test_app/app/models/custom_exchange_rate.dart';
+import 'package:test_app/app/services/database_service.dart';
+import 'package:test_app/app/controllers/expenditure_controller.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
+import 'dart:convert'; 
+import 'package:intl/intl.dart'; 
+import 'package:flutter_phoenix/flutter_phoenix.dart';
+
+class SettingsController with ChangeNotifier {
+  static const String settingsBoxName = 'settings';
+  late Settings _settings;
+
+  Settings get settings => _settings;
+
+  List<CustomExchangeRate> _customRates = [];
+  List<CustomExchangeRate> get customRates => _customRates;
+
+  final DatabaseService _dbService = DatabaseService();
+
+  SettingsController() {
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final box = Hive.box<Settings>(settingsBoxName);
+    // If settings exist, load them. Otherwise, create default settings.
+    _settings = box.get(0) ?? Settings();
+    notifyListeners();    
+    
+    _customRates = _dbService.getAllCustomRates();
+    notifyListeners();
+  }
+
+  Future<void> updatePrimaryCurrency(
+    ExpenditureController expenditureController,
+    AssetsController assetsController, 
+    String newCode,
+    Future<double?> Function(String, String) getRateCallback,
+  ) async {
+    final oldCode = _settings.primaryCurrencyCode;
+    if (oldCode == newCode) return;
+
+    final rate = await getRateCallback(oldCode, newCode);
+    if (rate == null) {
+      // You could throw an error here to be caught by the UI
+      print("Failed to get exchange rate. Aborting conversion.");
+      throw Exception("Rate fetch failed");
+    }
+
+    // ** THE FIX: Call both conversion methods **
+    await expenditureController.convertAllExpenditures(rate, newCode);
+    await assetsController.convertAllAssetData(rate);
+
+    _settings.primaryCurrencyCode = newCode;
+    await saveSettings();
+  }
+
+  Future<void> addOrUpdateCustomRate(String from, String to, double rate) async {
+    final pair = "${from}_$to";
+    final customRate = CustomExchangeRate(conversionPair: pair, rate: rate);
+    await _dbService.saveCustomRate(customRate);
+    _loadSettings(); // Reload and notify
+  }
+
+  Future<void> deleteCustomRate(String pair) async {
+    await _dbService.deleteCustomRate(pair);
+    _loadSettings();
+  }
+
+  Future<void> saveSettings() async {
+    final box = Hive.box<Settings>(settingsBoxName);
+    await box.put(0, _settings);
+    notifyListeners();
+  }
+
+  // Methods to update specific settings
+  void updateDividerType(DividerType type) {
+    _settings.dividerType = type;
+    saveSettings();
+  }
+
+  void updatePaydayStartDay(int day) {
+    _settings.paydayStartDay = day;
+    saveSettings();
+  }
+
+  void updateFixedIntervalDays(int days) {
+    _settings.fixedIntervalDays = days;
+    saveSettings();
+  }
+
+  void updateLanguage(String? code) {
+    _settings.languageCode = code;
+    saveSettings();
+  }
+
+  void updatePaginationLimit(int limit) {
+    _settings.paginationLimit = limit;
+    saveSettings();
+  }
+
+  Future<String?> exportData() async {
+    try {
+      // 1. Get the data as a JSON string, just like before.
+      final jsonString = await _dbService.exportAllDataToJson();
+
+      // 2. Convert the string to a list of bytes (Uint8List) using UTF-8 encoding.
+      final bytes = utf8.encode(jsonString);
+      
+      // 3. Let the user choose where to save the file.
+      // We now pass the `bytes` directly to the saveFile method.
+      final fileName = 'kakeibo_backup_${DateFormat('yyyy-MM-dd-HH-mm').format(DateTime.now())}.json';
+      
+      String? outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: 'Please select an output file:',
+        fileName: fileName,
+        bytes: bytes, // ** THE FIX: Provide the file content as bytes **
+      );
+
+      // On mobile, `outputFile` will often be null even on success,
+      // because the system handles the saving, not the app.
+      // On desktop, it will contain the path.
+      // So, we can consider it a success if no exception was thrown.
+      if (Platform.isAndroid || Platform.isIOS) {
+        // On mobile, a null path after the picker closes usually means success
+        // or user cancellation. We can't distinguish perfectly, but we can assume success.
+        return "Saved successfully to device storage.";
+      }
+      
+      return outputFile; // On desktop, this will be the actual path.
+
+    } catch (e) {
+      print("Export failed: $e");
+    }
+    return null;
+  }
+
+  Future<bool> importData(BuildContext context) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final jsonString = await file.readAsString();
+        
+        // 1. Delegate the import process to the database service.
+        // This clears old data and writes the new data.
+        await _dbService.importAllDataFromJson(jsonString);
+        
+        // 2. CRUCIAL: Trigger a full restart of the app.
+        if (context.mounted) {
+          Phoenix.rebirth(context);
+        }
+        
+        return true;
+      }
+    } catch (e) {
+      print("Import failed: $e");
+    }
+    return false;
+  }
+}

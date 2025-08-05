@@ -1,0 +1,18 @@
+I am about to do a progress report on an app that i am working on, the app is called 家計簿アプリ, help me create a powerpoint presentation in japanese showcasing the app's feature, these are the functionalities that the app currently possess:
+1/ User can create 4 digit pin to lock the app, when the app is locked, the data is encrypted
+2/ The transaction page's UI is redone, now there in card style, with the divider acts as the card's title
+2.1/ User can add transaction either as income or expenditure, they can also add tags for management, or suggest tags based on expenditure's name; User can also add transaction in another currency and it will be converted back to the main currency
+3/ User can filter the home page for transaction in a specific time frame
+4/ User can search for transaction based on keyword, amount range, Date range, tag
+5/ User can add transactions the appear automatically (for transaction like land rent, gas bill, subscription services, daily wages, monthly salary,...) there are also many repeat type setting: at the start at the month, specific date of the month, the end of the month, n-days before end of the month, every n days. User can specify ending date, or it can go on indefinitely. User can deactivate it quickly on the management screen. User can not specify the amount and fill it in later for reorccuring transactions that does not have a fixed amount of money like utilities bill.
+6/ User can manage tags: see all the tags added, edit their color, icon; create new tags, add new icon
+7/ There is a currency converter page that get the currency exchange rate each day and user can use this to quickly calculate currency exchange
+8/ There is a report page that report about the user's money usage in a time frame, and breaking down expenditure and income in a pie chart style as different tags, user can click on a tag to see all expenditures containing that tag in the time frame 
+9/ User can add their saving accounts and saving goals. Saving accounts contain account name, money in the account, yearly interest rate, notes if they want, and opening date as well as closing date, helping user remember all their bank books, and closing date so that they can remember to go withdraw the money. Saving goals user can specify the goal, automatically create transactions that says how much money have been used toward the goal
+10/ User can change between 3 languages: english, japanese, and vietnamese
+11/ User can change the primary currency, once changed, all currency in the app will be exchanged according to the exchange rate to the new currency, user can also add custom exchange rate if they want to (like the rate that they used to exchanged their money)
+12/ User can set to whether they want to use the PIN lock or not 
+13/ User can set the divider on how to divide the transactions: by calendar month, by payday cycle (specific date of the month), or by fixed intervals. 
+14/ User can change the pagination, how many transaction will be loaded at a time so that if their phone is weak it wouldn't be very laggy trying to load in too many transactions at once
+15/ User can export all of the date into a file and then use that file to import all the data into the app, making it possible to transfer data from an app from one phone to another
+16/ User can delete all data, making the app like new
