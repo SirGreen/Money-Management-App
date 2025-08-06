@@ -29,27 +29,30 @@ import 'package:test_app/app/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('ja', null);
-  await initializeDateFormatting('en', null);
-  await initializeDateFormatting('vi', null);
+  try {
+    await initializeDateFormatting('ja', null);
+    await initializeDateFormatting('en', null);
+    await initializeDateFormatting('vi', null);
 
-  await Hive.initFlutter();
+    await Hive.initFlutter();
 
-  Hive.registerAdapter(ExpenditureAdapter());
-  Hive.registerAdapter(TagAdapter());
-  Hive.registerAdapter(SettingsAdapter());
-  Hive.registerAdapter(DividerTypeAdapter());
-  Hive.registerAdapter(ScheduledExpenditureAdapter());
-  Hive.registerAdapter(ScheduleTypeAdapter());
-  Hive.registerAdapter(CustomExchangeRateAdapter());
-  Hive.registerAdapter(CachedRateAdapter());
-  Hive.registerAdapter(SavingGoalAdapter());
-  Hive.registerAdapter(SavingAccountAdapter());
-  Hive.registerAdapter(InvestmentAdapter());
-  Hive.registerAdapter(PortfolioAdapter());
+    Hive.registerAdapter(ExpenditureAdapter());
+    Hive.registerAdapter(TagAdapter());
+    Hive.registerAdapter(SettingsAdapter());
+    Hive.registerAdapter(DividerTypeAdapter());
+    Hive.registerAdapter(ScheduledExpenditureAdapter());
+    Hive.registerAdapter(ScheduleTypeAdapter());
+    Hive.registerAdapter(CustomExchangeRateAdapter());
+    Hive.registerAdapter(CachedRateAdapter());
+    Hive.registerAdapter(SavingGoalAdapter());
+    Hive.registerAdapter(SavingAccountAdapter());
+    Hive.registerAdapter(InvestmentAdapter());
+    Hive.registerAdapter(PortfolioAdapter());
 
-  await NotificationService().initForApp();
-
+    await NotificationService().initForApp();
+  } catch (e, stack) {
+    debugPrint('Initialization error: $e\n$stack');
+  }
   runApp(Phoenix(child: const AppRoot()));
 }
 
@@ -108,7 +111,7 @@ class _AppLifecycleManagerState extends State<AppLifecycleManager>
           _isLocked = true;
         });
       }
-      print("App is paused. Checking for incomplete transactions...");
+      debugPrint("App is paused. Checking for incomplete transactions...");
       _handleIncompleteTransactionNotifications();
     }
   }
@@ -157,63 +160,67 @@ class _AppLifecycleManagerState extends State<AppLifecycleManager>
   }
 
   Future<void> _initializeApp() async {
-    final tempDir = await getTemporaryDirectory();
-    final importFile = File(path.join(tempDir.path, 'import_data.json'));
-    final secureStorage = SecureStorageService();
-    final dbService = DatabaseService();
-    String? jsonToImport;
-    String? preservedPin = await secureStorage.getPin();
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final importFile = File(path.join(tempDir.path, 'import_data.json'));
+      final secureStorage = SecureStorageService();
+      final dbService = DatabaseService();
+      String? jsonToImport;
+      String? preservedPin = await secureStorage.getPin();
 
-    if (await importFile.exists()) {
-      jsonToImport = await importFile.readAsString();
-      await importFile.delete();
-      await Hive.deleteFromDisk();
-    }
+      if (await importFile.exists()) {
+        jsonToImport = await importFile.readAsString();
+        await importFile.delete();
+        await Hive.deleteFromDisk();
+      }
 
-    final bool shouldBeEncrypted = preservedPin != null;
-    final encryptionKey = await EncryptionService.getEncryptionKey();
-    final cipher = shouldBeEncrypted ? HiveAesCipher(encryptionKey) : null;
-    await dbService.openAllBoxes(encryptionCipher: cipher);
+      final bool shouldBeEncrypted = preservedPin != null;
+      final encryptionKey = await EncryptionService.getEncryptionKey();
+      final cipher = shouldBeEncrypted ? HiveAesCipher(encryptionKey) : null;
+      await dbService.openAllBoxes(encryptionCipher: cipher);
 
-    if (jsonToImport != null) {
-      await dbService.importAllDataFromJson(jsonToImport);
-    }
+      if (jsonToImport != null) {
+        await dbService.importAllDataFromJson(jsonToImport);
+      }
 
-    final pinAfterSetup = await secureStorage.getPin();
-    final isPinSet = pinAfterSetup != null;
+      final pinAfterSetup = await secureStorage.getPin();
+      final isPinSet = pinAfterSetup != null;
 
-    final settingsController = Provider.of<SettingsController>(
-      context,
-      listen: false,
-    );
-    await settingsController.initialize();
+      final settingsController = Provider.of<SettingsController>(
+        context,
+        listen: false,
+      );
+      await settingsController.initialize();
 
-    final assetsController = Provider.of<AssetsController>(
-      context,
-      listen: false,
-    );
-    await assetsController.initialize();
+      final assetsController = Provider.of<AssetsController>(
+        context,
+        listen: false,
+      );
+      await assetsController.initialize();
 
-    final expenditureController = Provider.of<ExpenditureController>(
-      context,
-      listen: false,
-    );
-    final locale = settingsController.settings.languageCode != null
-        ? Locale(settingsController.settings.languageCode!)
-        : WidgetsBinding.instance.platformDispatcher.locale;
+      final expenditureController = Provider.of<ExpenditureController>(
+        context,
+        listen: false,
+      );
+      final locale = settingsController.settings.languageCode != null
+          ? Locale(settingsController.settings.languageCode!)
+          : WidgetsBinding.instance.platformDispatcher.locale;
 
-    _l10n = await AppLocalizations.delegate.load(locale);
-    await expenditureController.initialize(_l10n!, settingsController.settings);
+      _l10n = await AppLocalizations.delegate.load(locale);
+      await expenditureController.initialize(_l10n!, settingsController.settings);
 
-    await _handleLoginNotifications();
-    await _handleIncompleteTransactionNotifications();
+      await _handleLoginNotifications();
+      await _handleIncompleteTransactionNotifications();
 
-    if (mounted) {
-      setState(() {
-        _pinIsSet = isPinSet;
-        _isLocked = isPinSet;
-        _isInitialized = true;
-      });
+      if (mounted) {
+        setState(() {
+          _pinIsSet = isPinSet;
+          _isLocked = isPinSet;
+          _isInitialized = true;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('App initialization error: $e\n$stack');
     }
   }
 
